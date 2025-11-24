@@ -25,7 +25,6 @@ GATs capture spatial dependencies across traffic locations, while the LLM models
 * Pretrained LLM for long-range temporal reasoning
 * Unified fusion of spatial, temporal, and positional embeddings
 * Transformer-compatible input formatting
-* Benchmark evaluation on METR-LA, PEMS, and similar datasets
 * Outperforms existing graph-based and LLM-based models
 
 ---
@@ -73,3 +72,4 @@ If you use this work in your research, please cite:
 ```
 
 ---
+
