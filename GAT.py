@@ -27,6 +27,9 @@ class GATLayer(nn.Module):
         h: [B, N, F]
         adj: [B, N, N]
         """
+        if adj.device != h.device:
+            adj = adj.to(h.device)
+
         if h.dim() == 2:  # handle unbatched input
             h = h.unsqueeze(0)
         if adj.dim() == 2:

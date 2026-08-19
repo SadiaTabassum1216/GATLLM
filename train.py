@@ -244,16 +244,17 @@ def main():
             f"Please ensure dataset is unzipped into 'data/' or 'Dataset/'."
         )
 
+    device = torch.device(args.device)
+
     if adj_path.endswith(".npy"):
         adj_mx = np.load(adj_path)
     else:
         with open(adj_path, "rb") as f:
             adj_mx = pickle.load(f)
 
-    adj = torch.tensor(adj_mx[0] if isinstance(adj_mx, list) else adj_mx, dtype=torch.float32)
+    adj = torch.tensor(adj_mx[0] if isinstance(adj_mx, list) else adj_mx, dtype=torch.float32).to(device)
     adj = normalize_adj(adj)
 
-    device = torch.device(args.device)
     dataloader = util.load_dataset(
         args.data, args.batch_size, args.batch_size, args.batch_size
     )
