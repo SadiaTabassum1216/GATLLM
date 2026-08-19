@@ -14,7 +14,7 @@ parser.add_argument("--channels", type=int, default=64)
 parser.add_argument("--num_nodes", type=int, default=170)
 parser.add_argument("--llm_layer", type=int, default=3)
 parser.add_argument("--input_len", type=int, default=12)
-parser.add_argument("--output_len", type=int, default=48)
+parser.add_argument("--output_len", type=int, default=12)
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--learning_rate", type=float, default=0.001, help="learning rate")
 parser.add_argument("--dropout", type=float, default=0.1, help="dropout rate")
@@ -56,56 +56,77 @@ def main():
             "num_nodes": 883,
             "adj_path": "data/adj/adj_PEMS07_gs.npy",
             "input_dim": 1,
+            "input_len": 12,
+            "output_len": 12,
         },
         "PEMS08": {
             "path": "data/PEMS08",
             "num_nodes": 170,
             "adj_path": "data/adj/adj_PEMS08_gs.npy",
             "input_dim": 1,
+            "input_len": 12,
+            "output_len": 12,
         },
         "PEMS08_36": {
             "path": "data/PEMS08_36",
             "num_nodes": 170,
             "adj_path": "data/adj/adj_PEMS08_gs.npy",
             "input_dim": 1,
+            "input_len": 36,
+            "output_len": 36,
         },
         "PEMS08_48": {
             "path": "data/PEMS08_48",
             "num_nodes": 170,
             "adj_path": "data/adj/adj_PEMS08_gs.npy",
+            "input_dim": 1,
+            "input_len": 48,
+            "output_len": 48,
         },
         "PEMS03": {
             "path": "data/PEMS03",
             "num_nodes": 358,
             "adj_path": "data/adj/adj_PEMS03_gs.npy",
             "input_dim": 1,
+            "input_len": 12,
+            "output_len": 12,
         },
         "PEMS04": {
             "path": "data/PEMS04",
             "num_nodes": 307,
             "adj_path": "data/adj/adj_PEMS04_gs.npy",
             "input_dim": 1,
+            "input_len": 12,
+            "output_len": 12,
         },
         "PEMS04_36": {
             "path": "data/PEMS04_36",
             "num_nodes": 307,
             "adj_path": "data/adj/adj_PEMS04_gs.npy",
             "input_dim": 1,
+            "input_len": 36,
+            "output_len": 36,
         },
         "PEMS04_48": {
             "path": "data/PEMS04_48",
             "num_nodes": 307,
             "adj_path": "data/adj/adj_PEMS04_gs.npy",
             "input_dim": 1,
+            "input_len": 48,
+            "output_len": 48,
         },
         "bike_drop": {
             "path": "data/bike_drop/bike_drop",
             "num_nodes": 250,
+            "input_len": 12,
+            "output_len": 12,
             "adj_path": "data/bike_drop/bike_drop/adj_mx.pkl",
         },
         "bike_pick": {
             "path": "data/bike_pick/bike_pick",
             "num_nodes": 250,
+            "input_len": 12,
+            "output_len": 12,
             "adj_path": "data/bike_pick/bike_pick/adj_mx.pkl",
         },
         "CAir_AQI": {
@@ -321,7 +342,8 @@ def main():
     yhat = yhat[: realy.size(0), ...]
 
     amae, amape, armse, awmape = [], [], [], []
-    for i in range(args.output_len):
+    eval_len = min(args.output_len, realy.shape[-1], yhat.shape[-1])
+    for i in range(eval_len):
         pred = scaler.inverse_transform(yhat[:, :, i])
         real = realy[:, :, i]
         mae, mape, rmse, wmape = util.metric(pred, real)
@@ -334,7 +356,7 @@ def main():
         awmape.append(wmape)
 
     print(
-        f"\n--- Evaluation Summary ({args.data} over {args.output_len} horizons) ---\n"
+        f"\n--- Evaluation Summary ({args.data} over {eval_len} horizons) ---\n"
         f"Test MAE:   {np.mean(amae):.4f}\n"
         f"Test MAPE:  {np.mean(amape):.4f}\n"
         f"Test RMSE:  {np.mean(armse):.4f}\n"

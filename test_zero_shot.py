@@ -13,7 +13,7 @@ parser.add_argument("--channels", type=int, default=64)
 parser.add_argument("--num_nodes", type=int, default=170)
 parser.add_argument("--llm_layer", type=int, default=1)
 parser.add_argument("--input_len", type=int, default=12)
-parser.add_argument("--output_len", type=int, default=48)
+parser.add_argument("--output_len", type=int, default=12)
 parser.add_argument("--batch_size", type=int, default=8)
 parser.add_argument("--learning_rate", type=float, default=0.001, help="learning rate")
 parser.add_argument("--dropout", type=float, default=0.1, help="dropout rate")
@@ -50,14 +50,18 @@ def main():
             "output_len": 12,
             "adj_path": "data/taxi_pick/taxi_pick/adj_mx.pkl",
         },
-            "bike_drop": {
+        "bike_drop": {
             "path": "data/bike_drop/bike_drop",
             "num_nodes": 250,
+            "input_len": 12,
+            "output_len": 12,
             "adj_path": "data/bike_drop/bike_drop/adj_mx.pkl",
         },
         "bike_pick": {
             "path": "data/bike_pick/bike_pick",
             "num_nodes": 250,
+            "input_len": 12,
+            "output_len": 12,
             "adj_path": "data/bike_pick/bike_pick/adj_mx.pkl",
         },
     }
@@ -129,7 +133,8 @@ def main():
     yhat = yhat[: realy.size(0), ...]
 
     amae, amape, armse, awmape = [], [], [], []
-    for i in range(args.output_len):
+    eval_len = min(args.output_len, realy.shape[-1], yhat.shape[-1])
+    for i in range(eval_len):
         pred = scaler.inverse_transform(yhat[:, :, i])
         real = realy[:, :, i]
         mae, mape, rmse, wmape = util.metric(pred, real)
@@ -141,7 +146,7 @@ def main():
         armse.append(rmse)
         awmape.append(wmape)
 
-    log = "\nOn average over 48 horizons(24 hours with 30min intervals), \nTest MAE: {:.4f}, \nTest MAPE: {:.4f}, \nTest RMSE: {:.4f}, \nTest WMAPE: {:.4f}"
+    log = f"\nOn average over {eval_len} horizons, \nTest MAE: {{:.4f}}, \nTest MAPE: {{:.4f}}, \nTest RMSE: {{:.4f}}, \nTest WMAPE: {{:.4f}}"
     print(log.format(np.mean(amae), np.mean(amape), np.mean(armse), np.mean(awmape)))
 
     realy = realy.to("cpu")
