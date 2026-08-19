@@ -12,7 +12,7 @@ parser.add_argument("--data", type=str, default="PEMS07")
 parser.add_argument("--input_dim", type=int, default=3)
 parser.add_argument("--channels", type=int, default=64)
 parser.add_argument("--num_nodes", type=int, default=170)
-parser.add_argument("--llm_layer", type=int, default=1)
+parser.add_argument("--llm_layer", type=int, default=3)
 parser.add_argument("--input_len", type=int, default=12)
 parser.add_argument("--output_len", type=int, default=48)
 parser.add_argument("--batch_size", type=int, default=8)
@@ -266,6 +266,27 @@ def main():
     
     adj_tensor = normalize_adj(adj_tensor)
 
+    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
+    state_dict = checkpoint["model_state_dict"] if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint else checkpoint
+
+    if "node_emb" not in state_dict:
+        raise KeyError(
+            "Trained checkpoint does not contain node_emb. Please ensure the model was saved correctly."
+        )
+
+    # Auto-detect llm_layer from checkpoint keys
+    layer_indices = []
+    for k in state_dict.keys():
+        if k.startswith("gpt.gpt2.h."):
+            parts = k.split(".")
+            if len(parts) > 3 and parts[3].isdigit():
+                layer_indices.append(int(parts[3]))
+    if layer_indices:
+        inferred_layers = max(layer_indices) + 1
+        if inferred_layers != args.llm_layer:
+            print(f"Auto-detected llm_layer={inferred_layers} from checkpoint (was {args.llm_layer})")
+            args.llm_layer = inferred_layers
+
     model = GATLLM(
         input_dim=args.input_dim,
         channels=args.channels,
@@ -278,17 +299,8 @@ def main():
     )
     model.to(device)
 
-    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
-    if "model_state_dict" in checkpoint:
-        checkpoint = checkpoint["model_state_dict"]
-
-    if "node_emb" not in checkpoint:
-        raise KeyError(
-            "--------------------Trained checkpoint does not contain node_emb. Please ensure the model was saved correctly."
-        )
-
-    model.load_state_dict(checkpoint, strict=True)
-    print("Model load successfully...")
+    model.load_state_dict(state_dict, strict=True)
+    print("Model loaded successfully...")
     model.eval()
 
     dataloader = util.load_dataset(
