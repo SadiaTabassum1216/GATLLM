@@ -68,9 +68,8 @@ class trainer:
         self.scaler = scaler
         self.clip = 7  # Gradient clipping value
         self.adj = adj
-        print("The number of parameters: {}".format(self.model.param_num()))
-        print("node_emb shape at init:", self.model.node_emb.shape)
-        print(self.model)
+        param_count = self.model.param_num()
+        print(f"Model initialized | Parameters: {param_count:,} ({param_count / 1e6:.2f}M)")
 
     def train(self, input, real_val):
         self.model.train()
@@ -298,18 +297,24 @@ def main():
             engine.model.load_state_dict(checkpoint)
             print("Loaded model weights only (no optimizer or epoch info).")
 
-    print("start training...", flush=True)
+    print("Starting training...\n", flush=True)
 
     total_epochs = args.epochs
+    total_batches = dataloader["train_loader"].num_batch
 
     for i in range(start_epoch, total_epochs + 1):
         dataloader["train_loader"].shuffle()
         train_loss, train_mae, train_mape, train_rmse, train_wmape = [], [], [], [], []
         t1 = time.time()
 
-        for iter, (x, y) in enumerate(
-            tqdm(dataloader["train_loader"].get_iterator(), desc=f"Epoch {i}")
-        ):
+        pbar = tqdm(
+            dataloader["train_loader"].get_iterator(),
+            total=total_batches,
+            desc=f"Epoch {i:03d}/{total_epochs}",
+            leave=False,
+        )
+
+        for iter, (x, y) in enumerate(pbar):
             trainx = torch.Tensor(x).to(device).transpose(1, 3)
             trainy = torch.Tensor(y).to(device).transpose(1, 3)
             real = trainy[:, 0:1, :, :].permute(0, 3, 2, 1).contiguous()  # [B, output_len, N, 1]
@@ -320,22 +325,29 @@ def main():
             train_mape.append(metrics[2])
             train_rmse.append(metrics[3])
             train_wmape.append(metrics[4])
-            if iter % args.print_every == 0:
-                print(
-                    f"\n  Iter {iter:03d} | Loss: {metrics[0]:.4f}, MAE: {metrics[1]:.4f}, MAPE: {metrics[2]:.4f}, RMSE: {metrics[3]:.4f}, WMAPE: {metrics[4]:.4f}"
+
+            if (iter + 1) % 10 == 0 or iter == total_batches - 1:
+                pbar.set_postfix(
+                    {
+                        "Loss": f"{metrics[0]:.4f}",
+                        "MAE": f"{metrics[1]:.4f}",
+                        "RMSE": f"{metrics[3]:.4f}",
+                    }
                 )
 
         t2 = time.time()
         avg_loss = np.mean(train_loss)
+        avg_mae = np.mean(train_mae)
+        avg_rmse = np.mean(train_rmse)
         print(
-            f"Epoch {i:03d} completed in {t2 - t1:.2f} seconds. Avg Loss: {avg_loss:.4f}"
+            f"Epoch {i:03d}/{total_epochs} | Loss: {avg_loss:.4f} | MAE: {avg_mae:.4f} | RMSE: {avg_rmse:.4f} | Time: {t2 - t1:.1f}s"
         )
 
         if avg_loss < best_loss:
             best_loss = avg_loss
             best_epoch = i
             epochs_since_best = 0
-            checkpoint_path = os.path.join(path, f"best_model.pth")
+            checkpoint_path = os.path.join(path, "best_model.pth")
             torch.save(
                 {
                     "epoch": i,
@@ -345,9 +357,7 @@ def main():
                 },
                 checkpoint_path,
             )
-            print(
-                f"Model saved to {checkpoint_path} at epoch {i} with loss {avg_loss:.4f}"
-            )
+            print(f"  └─> Best model saved (Loss: {avg_loss:.4f})")
         else:
             epochs_since_best += 1
 
@@ -367,9 +377,7 @@ def main():
             break
 
     print(
-        "\nTraining complete. Best model from epoch {} with loss {:.4f}".format(
-            best_epoch, best_loss
-        )
+        f"\nTraining complete. Best model at Epoch {best_epoch} with loss {best_loss:.4f}"
     )
 
 

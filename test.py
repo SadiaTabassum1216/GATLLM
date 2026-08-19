@@ -320,8 +320,13 @@ def main():
         armse.append(rmse)
         awmape.append(wmape)
 
-    log = "\nOn average over 48 horizons(24 hours with 30min intervals), \nTest MAE: {:.4f}, \nTest MAPE: {:.4f}, \nTest RMSE: {:.4f}, \nTest WMAPE: {:.4f}"
-    print(log.format(np.mean(amae), np.mean(amape), np.mean(armse), np.mean(awmape)))
+    print(
+        f"\n--- Evaluation Summary ({args.data} over {args.output_len} horizons) ---\n"
+        f"Test MAE:   {np.mean(amae):.4f}\n"
+        f"Test MAPE:  {np.mean(amape):.4f}\n"
+        f"Test RMSE:  {np.mean(armse):.4f}\n"
+        f"Test WMAPE: {np.mean(awmape):.4f}\n"
+    )
 
     realy = realy.to("cpu")
     yhat1 = scaler.inverse_transform(yhat)

@@ -64,7 +64,6 @@ def load_dataset(dataset_dir, batch_size, valid_batch_size=None, test_batch_size
     for category in ["train", "val", "test"]:
         data["x_" + category][..., 0] = scaler.transform(data["x_" + category][..., 0])
 
-    print("Perform shuffle on the dataset")
     random_train = torch.randperm(int(data["x_train"].shape[0])).numpy()
     data["x_train"] = data["x_train"][random_train, ...]
     data["y_train"] = data["y_train"][random_train, ...]
@@ -77,8 +76,10 @@ def load_dataset(dataset_dir, batch_size, valid_batch_size=None, test_batch_size
     data["val_loader"] = DataLoader(data["x_val"], data["y_val"], valid_batch_size)
     data["test_loader"] = DataLoader(data["x_test"], data["y_test"], test_batch_size)
     data["scaler"] = scaler
-    print("Training samples: ", data["x_train"].shape[0])
-    print("Iters per epoch: ", data["train_loader"].num_batch)
+    print(
+        f"Dataset loaded | Train: {data['x_train'].shape[0]} samples ({data['train_loader'].num_batch} batches) | "
+        f"Val: {data['x_val'].shape[0]} | Test: {data['x_test'].shape[0]}"
+    )
 
     return data
 
