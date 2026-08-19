@@ -162,11 +162,95 @@ def main():
 
     config = dataset_config[args.data]
     args.path = config["path"]
-    # args.data = config["path"]
     args.num_nodes = config["num_nodes"]
     args.input_len = config.get("input_len", args.input_len)
     args.output_len = config.get("output_len", args.output_len)
     args.adjdata = config.get("adj_path", f"data/adj/adj_{args.path}.npy")
+
+    # Search for valid paths across candidate root folders
+    candidate_roots = [
+        "Dataset/all_data",
+        "data/all_data",
+        "../Dataset/all_data",
+        "../data/all_data",
+        "/kaggle/working/GATLLM/Dataset/all_data",
+        "/kaggle/working/GATLLM/data/all_data",
+        "/kaggle/working/Dataset/all_data",
+        "/kaggle/working/data/all_data",
+        "Dataset",
+        "data",
+        "all_data",
+        "../Dataset",
+        "../data",
+        "../all_data",
+        "/kaggle/working/GATLLM/Dataset",
+        "/kaggle/working/GATLLM/data",
+        "/kaggle/working/Dataset",
+        "/kaggle/working/data",
+        ".",
+        "..",
+        "/kaggle/working",
+    ]
+    if not os.path.exists(args.adjdata):
+        for root in candidate_roots:
+            if not os.path.exists(root):
+                continue
+            alt_adj_options = [
+                os.path.join(root, args.data, "adj_mx.pkl"),
+                os.path.join(root, args.data, "processed", "adj_mx.pkl"),
+                os.path.join(root, args.data, args.data, "adj_mx.pkl"),
+                os.path.join(root, "all_data", args.data, "adj_mx.pkl"),
+                os.path.join(root, "adj", f"adj_{args.data}_gs.npy"),
+                os.path.join(root, args.data, f"adj_{args.data.lower()}.npy"),
+                os.path.join(root, args.data, f"adj_{args.data.lower()}.pkl"),
+                os.path.join(root, args.data, "adj.pkl"),
+                os.path.join(root, args.data, "adj.npy"),
+            ]
+            for alt_adj in alt_adj_options:
+                if os.path.exists(alt_adj):
+                    args.adjdata = alt_adj
+                    break
+            if os.path.exists(args.adjdata):
+                break
+
+    if not os.path.exists(os.path.join(args.path, "test.npz")):
+        for root in candidate_roots:
+            if not os.path.exists(root):
+                continue
+            alt_data_options = [
+                os.path.join(root, args.data, "processed"),
+                os.path.join(root, "all_data", args.data, "processed"),
+                os.path.join(root, args.data, args.data, "processed"),
+                os.path.join(root, args.data, args.data),
+                os.path.join(root, args.data),
+                os.path.join(root, "all_data", args.data),
+            ]
+            for alt_data in alt_data_options:
+                if os.path.exists(os.path.join(alt_data, "test.npz")):
+                    args.path = alt_data
+                    break
+            if os.path.exists(os.path.join(args.path, "test.npz")):
+                break
+
+    # Recursive fallback search if still not found
+    if not os.path.exists(args.adjdata) or not os.path.exists(os.path.join(args.path, "test.npz")):
+        search_dirs = [".", "..", "/kaggle/working"]
+        for search_dir in search_dirs:
+            if not os.path.exists(search_dir):
+                continue
+            for current_root, dirs, files in os.walk(search_dir):
+                if "test.npz" in files and args.data in current_root:
+                    args.path = current_root
+                for f in files:
+                    if (
+                        f.endswith("adj_mx.pkl")
+                        or f.endswith("adj.pkl")
+                        or (f.startswith("adj_") and f.endswith(".npy"))
+                    ) and args.data in current_root:
+                        args.adjdata = os.path.join(current_root, f)
+
+    print(f"Loading adjacency matrix from: {args.adjdata}")
+    print(f"Loading dataset from: {args.path}")
 
     device = torch.device(args.device)
 

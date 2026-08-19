@@ -36,25 +36,56 @@ git clone https://github.com/SadiaTabassum1216/GATLLM.git
 cd GATLLM
 
 conda create -n gatllm python=3.8
-conda env list
 conda activate gatllm
 pip install -r requirements.txt
 ```
 
 ---
 
-## Training
+## Dataset Download & Setup
+
+Download and extract the benchmark datasets:
 
 ```bash
-python train.py --data taxi_drop > taxi_drop_train.log
+pip install gdown
+gdown "19LkZXBCS7E2SCuM2ZQ7YKT7L0-wMXrJa" -O datasets.zip
+unzip -q datasets.zip
+mv all_data Dataset
+ln -s Dataset data
+```
+
+The script automatically detects dataset files under `Dataset/all_data/<dataset_name>/processed/` and `adj_mx.pkl` under `Dataset/all_data/<dataset_name>/` (as well as `data/`, `Dataset/`, and flat folder layouts).
+
+### Supported Datasets:
+- `taxi_drop`
+- `taxi_pick`
+- `bike_drop`
+- `bike_pick`
+
+---
+
+## Running on Kaggle
+
+A ready-to-run Jupyter notebook [`gatllm_kaggle.ipynb`](gatllm_kaggle.ipynb) is provided. It handles cloning, dependency installation, dataset downloading, training on GPU, and testing.
+
+---
+
+## Training
+
+Train the model on your chosen dataset (use `--device cuda` for GPU or `--device cpu` for CPU):
+
+```bash
+python train.py --device cuda --data taxi_drop --epochs 100 --batch_size 8 > taxi_drop_train.log
 ```
 
 ---
 
 ## Evaluation
 
+Evaluate using the trained checkpoint:
+
 ```bash
-python test.py --data taxi_drop --checkpoint ./logs/xtaxi_drop/best_model.pth > taxi_drop_test.log
+python test.py --device cuda --data taxi_drop --checkpoint ./logs/xtaxi_drop/best_model.pth > taxi_drop_test.log
 ```
 
 ---

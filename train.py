@@ -125,33 +125,133 @@ def normalize_adj(adj):
     return torch.mm(torch.mm(D_inv_sqrt, adj), D_inv_sqrt)
 
 
+def find_dataset_paths(dataset_name):
+    node_map = {
+        "bike_drop": 250,
+        "bike_pick": 250,
+        "taxi_drop": 266,
+        "taxi_pick": 266,
+        "PEMS07": 883,
+        "PEMS08": 170,
+        "PEMS03": 358,
+        "PEMS04": 307,
+    }
+
+    candidate_roots = [
+        "Dataset/all_data",
+        "data/all_data",
+        "../Dataset/all_data",
+        "../data/all_data",
+        "/kaggle/working/GATLLM/Dataset/all_data",
+        "/kaggle/working/GATLLM/data/all_data",
+        "/kaggle/working/Dataset/all_data",
+        "/kaggle/working/data/all_data",
+        "Dataset",
+        "data",
+        "all_data",
+        "../Dataset",
+        "../data",
+        "../all_data",
+        "/kaggle/working/GATLLM/Dataset",
+        "/kaggle/working/GATLLM/data",
+        "/kaggle/working/Dataset",
+        "/kaggle/working/data",
+        ".",
+        "..",
+        "/kaggle/working",
+    ]
+
+    found_adj = None
+    found_data = None
+
+    for root in candidate_roots:
+        if not os.path.exists(root):
+            continue
+
+        possible_adj = [
+            os.path.join(root, dataset_name, "adj_mx.pkl"),
+            os.path.join(root, dataset_name, "processed", "adj_mx.pkl"),
+            os.path.join(root, dataset_name, dataset_name, "adj_mx.pkl"),
+            os.path.join(root, "all_data", dataset_name, "adj_mx.pkl"),
+            os.path.join(root, dataset_name, f"adj_{dataset_name.lower()}.pkl"),
+            os.path.join(root, "adj", f"adj_{dataset_name}_gs.npy"),
+            os.path.join(root, dataset_name, f"adj_{dataset_name.lower()}.npy"),
+            os.path.join(root, dataset_name, "adj.pkl"),
+            os.path.join(root, dataset_name, "adj.npy"),
+        ]
+
+        possible_data = [
+            os.path.join(root, dataset_name, "processed"),
+            os.path.join(root, "all_data", dataset_name, "processed"),
+            os.path.join(root, dataset_name, dataset_name, "processed"),
+            os.path.join(root, dataset_name, dataset_name),
+            os.path.join(root, dataset_name),
+            os.path.join(root, "all_data", dataset_name),
+        ]
+
+        if not found_adj:
+            for adj_p in possible_adj:
+                if os.path.exists(adj_p):
+                    found_adj = adj_p
+                    break
+
+        if not found_data:
+            for data_d in possible_data:
+                if os.path.exists(os.path.join(data_d, "train.npz")):
+                    found_data = data_d
+                    break
+
+        if found_adj and found_data:
+            return found_adj, found_data, node_map.get(dataset_name, 250)
+
+    # Recursive fallback search across working directory if still not found
+    search_dirs = [".", "..", "/kaggle/working"]
+    for search_dir in search_dirs:
+        if not os.path.exists(search_dir):
+            continue
+        for current_root, dirs, files in os.walk(search_dir):
+            if "train.npz" in files and dataset_name in current_root:
+                found_data = current_root
+            for f in files:
+                if (
+                    f.endswith("adj_mx.pkl")
+                    or f.endswith("adj.pkl")
+                    or (f.startswith("adj_") and f.endswith(".npy"))
+                ) and dataset_name in current_root:
+                    found_adj = os.path.join(current_root, f)
+            if found_adj and found_data:
+                return found_adj, found_data, node_map.get(dataset_name, 250)
+
+    default_adj = found_adj if found_adj else os.path.join("data", dataset_name, dataset_name, "adj_mx.pkl")
+    default_data = found_data if found_data else os.path.join("data", dataset_name, dataset_name)
+    return default_adj, default_data, node_map.get(dataset_name, 250)
+
+
 def main():
     seed_it(6666)
     data = args.data
-    adj_path = os.path.join("data", args.data, args.data, "adj_mx.pkl")
-    # adj_path = os.path.join("data", args.data, "adj_pems07.pkl")
 
-    with open(adj_path, "rb") as f:
-        adj_mx = pickle.load(f)
+    adj_path, data_path, num_nodes = find_dataset_paths(args.data)
+    args.num_nodes = num_nodes
+    args.data = data_path
 
-    adj = torch.tensor(adj_mx, dtype=torch.float32)
+    print(f"Loading adjacency matrix from: {adj_path}")
+    print(f"Loading dataset from: {data_path}")
+
+    if not os.path.exists(adj_path):
+        raise FileNotFoundError(
+            f"Adjacency matrix not found at '{adj_path}'. "
+            f"Please ensure dataset is unzipped into 'data/' or 'Dataset/'."
+        )
+
+    if adj_path.endswith(".npy"):
+        adj_mx = np.load(adj_path)
+    else:
+        with open(adj_path, "rb") as f:
+            adj_mx = pickle.load(f)
+
+    adj = torch.tensor(adj_mx[0] if isinstance(adj_mx, list) else adj_mx, dtype=torch.float32)
     adj = normalize_adj(adj)
-
-    if args.data == "bike_drop":
-        args.data = "data/bike_drop/" + args.data
-        args.num_nodes = 250
-    elif args.data == "bike_pick":
-        args.data = "data//bike_pick//" + args.data
-        args.num_nodes = 250
-    elif args.data == "taxi_drop":
-        args.data = "data//taxi_drop//" + args.data
-        args.num_nodes = 266
-    elif args.data == "taxi_pick":
-        args.data = "data//taxi_pick//" + args.data
-        args.num_nodes = 266
-    elif args.data == "PEMS07":
-        args.data = "data/PEMS07/" + args.data
-        args.num_nodes = 883
 
     device = torch.device(args.device)
     dataloader = util.load_dataset(
