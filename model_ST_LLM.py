@@ -75,7 +75,7 @@ class ST_LLM(nn.Module):
 
         # regression
         self.regression_layer = nn.Conv2d(
-            gpt_channel * 3, self.output_len, kernel_size=(1, 1)
+            to_gpt_channel, self.output_len, kernel_size=(1, 1)
         )
 
     # return the total parameters of model

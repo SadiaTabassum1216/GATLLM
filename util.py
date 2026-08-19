@@ -1,6 +1,5 @@
 import numpy as np
 import os
-import scipy.sparse as sp
 import torch
 import pickle
 
@@ -66,20 +65,13 @@ def load_dataset(dataset_dir, batch_size, valid_batch_size=None, test_batch_size
         data["x_" + category][..., 0] = scaler.transform(data["x_" + category][..., 0])
 
     print("Perform shuffle on the dataset")
-    random_train = torch.arange(int(data["x_train"].shape[0]))
-    random_train = torch.randperm(random_train.size(0))
+    random_train = torch.randperm(int(data["x_train"].shape[0])).numpy()
     data["x_train"] = data["x_train"][random_train, ...]
     data["y_train"] = data["y_train"][random_train, ...]
 
-    random_val = torch.arange(int(data["x_val"].shape[0]))
-    random_val = torch.randperm(random_val.size(0))
+    random_val = torch.randperm(int(data["x_val"].shape[0])).numpy()
     data["x_val"] = data["x_val"][random_val, ...]
     data["y_val"] = data["y_val"][random_val, ...]
-
-    # random_test = torch.arange(int(data['x_test'].shape[0]))
-    # random_test = torch.randperm(random_test.size(0))
-    # data['x_test'] =  data['x_test'][random_test,...]
-    # data['y_test'] =  data['y_test'][random_test,...]
 
     data["train_loader"] = DataLoader(data["x_train"], data["y_train"], batch_size)
     data["val_loader"] = DataLoader(data["x_val"], data["y_val"], valid_batch_size)

@@ -29,6 +29,7 @@ class GATLayer(nn.Module):
         """
         if h.dim() == 2:  # handle unbatched input
             h = h.unsqueeze(0)
+        if adj.dim() == 2:
             adj = adj.unsqueeze(0)
 
         B, N, _ = h.shape
@@ -40,10 +41,11 @@ class GATLayer(nn.Module):
 
         e = self.leakyrelu(self.attn_fc(a_input).squeeze(-1))  # [B, N, N]
 
-        # Mask non-neighbors
-        e = torch.where(adj > 0, e, torch.full_like(e, -9e15))
+        # Mask non-neighbors (use -1e9 for numerical stability)
+        e = torch.where(adj > 0, e, torch.full_like(e, -1e9))
 
         attention = F.softmax(e, dim=-1)  # [B, N, N]
+        attention = torch.nan_to_num(attention, nan=0.0)
         attention = self.dropout(attention)
 
         h_prime = torch.bmm(attention, Wh)  # [B, N, out_features]

@@ -3,8 +3,7 @@ import argparse
 import torch
 import numpy as np
 import pickle
-# from model_ST_LLM import ST_LLM
-from model_GATLLM import GAT_LLM
+from model_GATLLM import GATLLM
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--device", type=str, default="cpu")
@@ -27,6 +26,7 @@ args = parser.parse_args()
 
 
 def normalize_adj(adj):
+    adj = adj + torch.eye(adj.size(0)).to(adj.device)
     degree = torch.sum(adj, dim=1)
     d_inv_sqrt = torch.pow(degree, -0.5)
     d_inv_sqrt[torch.isinf(d_inv_sqrt)] = 0.0
@@ -98,14 +98,14 @@ def main():
             "input_dim": 1,
         },
         "bike_drop": {
-            "path": "data/bike_drop",
+            "path": "data/bike_drop/bike_drop",
             "num_nodes": 250,
-            "adj_path": "data/adj/adj_PEMS07_gs.npy",
+            "adj_path": "data/bike_drop/bike_drop/adj_mx.pkl",
         },
         "bike_pick": {
-            "path": "data/bike_pick",
+            "path": "data/bike_pick/bike_pick",
             "num_nodes": 250,
-            "adj_path": "data/adj/adj_PEMS07_gs.npy",
+            "adj_path": "data/bike_pick/bike_pick/adj_mx.pkl",
         },
         "CAir_AQI": {
             "path": "data/CAir_AQI",
@@ -170,15 +170,18 @@ def main():
 
     device = torch.device(args.device)
 
-    with open(args.adjdata, "rb") as f:
-        adj_mx = pickle.load(f)
+    if args.adjdata.endswith(".npy"):
+        adj_mx = np.load(args.adjdata)
+    else:
+        with open(args.adjdata, "rb") as f:
+            adj_mx = pickle.load(f)
     adj_tensor = torch.tensor(
         adj_mx[0] if isinstance(adj_mx, list) else adj_mx, dtype=torch.float32
     ).to(device)
     
     adj_tensor = normalize_adj(adj_tensor)
 
-    model = GAT_LLM(
+    model = GATLLM(
         input_dim=args.input_dim,
         channels=args.channels,
         num_nodes=args.num_nodes,
@@ -214,7 +217,7 @@ def main():
         testx = torch.Tensor(x).to(device).transpose(1, 3)
         with torch.no_grad():
             preds = model(testx, adj_tensor).transpose(1, 3)
-        outputs.append(preds.squeeze())
+        outputs.append(preds.squeeze(1))
 
     # yhat = torch.cat(outputs, dim=0)[:realy.size(0)]
     yhat = torch.cat(outputs, dim=0)

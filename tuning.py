@@ -6,8 +6,7 @@ import numpy as np
 import torch
 import random
 from util import load_dataset, MAE_torch, MAPE_torch, RMSE_torch, WMAPE_torch
-from model_ST_LLM import ST_LLM
-from model_GATLLM import GAT_LLM
+from model_GATLLM import GATLLM
 from ranger21 import Ranger
 import torch.optim as optim
 import csv
@@ -33,6 +32,7 @@ def seed_it(seed=42):
     torch.cuda.manual_seed_all(seed)
 
 def normalize_adj(adj):
+    adj = adj + torch.eye(adj.size(0)).to(adj.device)
     degree = torch.sum(adj, dim=1)
     d_inv_sqrt = torch.pow(degree, -0.5)
     d_inv_sqrt[torch.isinf(d_inv_sqrt)] = 0.0
@@ -57,8 +57,8 @@ def log_trial_csv(trial_number, params, value):
 
 def train_and_evaluate(trial):
     # Optimization Hyperparameters
-    lrate = trial.suggest_loguniform("lrate", 1e-5, 1e-2)
-    wdecay = trial.suggest_loguniform("wdecay", 1e-6, 1e-2)
+    lrate = trial.suggest_float("lrate", 1e-5, 1e-2, log=True)
+    wdecay = trial.suggest_float("wdecay", 1e-6, 1e-2, log=True)
     optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "AdamW", "Ranger"])
     clip = trial.suggest_float("clip", 0.1, 10.0)
 
@@ -86,7 +86,7 @@ def train_and_evaluate(trial):
     adj = torch.tensor(adj_mx, dtype=torch.float32)
     adj = normalize_adj(adj)
 
-    model = ST_LLM(
+    model = GATLLM(
         input_dim=input_dim,
         channels=64,
         num_nodes=num_nodes,
@@ -98,9 +98,7 @@ def train_and_evaluate(trial):
     ).to(DEVICE)
     
     optimizer = get_optimizer(optimizer_name, model.parameters(), lrate, wdecay)
-    # optimizer = Ranger(model.parameters(), lr=lrate, weight_decay=wdecay)
     loss_fn = MAE_torch
-    # clip = 5
 
     model.train()
     best_loss = float("inf")
@@ -108,12 +106,11 @@ def train_and_evaluate(trial):
     for x, y in dataloader["train_loader"].get_iterator():
         trainx = torch.Tensor(x).to(DEVICE).transpose(1, 3)
         trainy = torch.Tensor(y).to(DEVICE).transpose(1, 3)
-        real = trainy.permute(0, 3, 2, 1).contiguous()
+        real = trainy[:, 0:1, :, :].permute(0, 3, 2, 1).contiguous()
 
         optimizer.zero_grad()
         output = model(trainx, adj)
         predict = scaler.inverse_transform(output)
-        real = real
         loss = loss_fn(predict, real, 0.0)
         loss.backward()
 

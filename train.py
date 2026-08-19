@@ -8,8 +8,7 @@ import os
 from util import *
 import random
 
-# from model_ST_LLM import ST_LLM
-from model_GATLLM import GAT_LLM
+from model_GATLLM import GATLLM
 from ranger21 import Ranger
 from tqdm import tqdm
 import pickle
@@ -23,16 +22,14 @@ parser.add_argument("--input_dim", type=int, default=3)  # 3 for bike and taxi, 
 parser.add_argument("--num_nodes", type=int, default=250)
 parser.add_argument("--input_len", type=int, default=12)
 parser.add_argument("--output_len", type=int, default=12)
-parser.add_argument("--batch_size", type=int, default=8)   # 64
-parser.add_argument("--lrate", type=float, default=1e-4)    #1e-3
-parser.add_argument("--llm_layer", type=int, default=3) #1
-parser.add_argument("--U", type=int, default=2) #1
-parser.add_argument("--epochs", type=int, default=300)  #100
+parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--lrate", type=float, default=1e-4)
+parser.add_argument("--llm_layer", type=int, default=3)
+parser.add_argument("--U", type=int, default=2)
+parser.add_argument("--epochs", type=int, default=300)
 parser.add_argument("--print_every", type=int, default=50)
 parser.add_argument("--gpt_layers", type=int, default=6)
-parser.add_argument("--wdecay", type=float, default=3e-3) #0.0001
-# parser.add_argument("--dropout", type=float, default=0.1)
-# parser.add_argument("--hidden_dim", type=int, default=128)
+parser.add_argument("--wdecay", type=float, default=3e-3)
 parser.add_argument("--save", type=str, default="./logs/x")
 parser.add_argument("--es_patience", type=int, default=100)
 parser.add_argument("--resume", type=str, default="", help="Path to checkpoint")
@@ -55,7 +52,7 @@ class trainer:
         device,
         adj,
     ):
-        self.model = GAT_LLM(
+        self.model = GATLLM(
             input_dim=input_dim,
             channels=64,
             num_nodes=num_nodes,
@@ -120,6 +117,7 @@ def seed_it(seed):
 
 
 def normalize_adj(adj):
+    adj = adj + torch.eye(adj.size(0)).to(adj.device)
     degree = torch.sum(adj, dim=1)
     d_inv_sqrt = torch.pow(degree, -0.5)
     d_inv_sqrt[torch.isinf(d_inv_sqrt)] = 0.0
@@ -204,7 +202,7 @@ def main():
     total_epochs = args.epochs
 
     for i in range(start_epoch, total_epochs + 1):
-    # for i in range(start_epoch, args.epochs + 1):
+        dataloader["train_loader"].shuffle()
         train_loss, train_mae, train_mape, train_rmse, train_wmape = [], [], [], [], []
         t1 = time.time()
 
@@ -213,8 +211,7 @@ def main():
         ):
             trainx = torch.Tensor(x).to(device).transpose(1, 3)
             trainy = torch.Tensor(y).to(device).transpose(1, 3)
-            # metrics = engine.train(trainx, trainy[:, 0, :, :])
-            real = trainy[:, :, :, :].permute(0, 3, 2, 1).contiguous()  # [B, output_len, N, 1]
+            real = trainy[:, 0:1, :, :].permute(0, 3, 2, 1).contiguous()  # [B, output_len, N, 1]
             metrics = engine.train(trainx, real)
 
             train_loss.append(metrics[0])

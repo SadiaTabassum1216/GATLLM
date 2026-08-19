@@ -11,9 +11,9 @@ def plot_traffic_t1_forecast(real_path: str, pred_path: str, sample_idx: int = 0
     y_true = torch.load(real_path)  # [B, N, T]
     y_pred = torch.load(pred_path)  # [B, N, T]
 
-    # Get the predicted and true values for t+1 (last time step)
-    true_vals_t1 = y_true[sample_idx, :, -3].detach().cpu().numpy()  # t+1 (third-to-last step)
-    pred_vals_t1 = y_pred[sample_idx, :, -3].detach().cpu().numpy()  # t+1 (third-to-last step)
+    # Get the predicted and true values for t+1 (first forecast step)
+    true_vals_t1 = y_true[sample_idx, :, 0].detach().cpu().numpy()  # t+1 (first step)
+    pred_vals_t1 = y_pred[sample_idx, :, 0].detach().cpu().numpy()  # t+1 (first step)
 
     # Time axis for nodes (0 to 266)
     nodes = np.arange(0, num_nodes)

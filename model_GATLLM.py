@@ -5,7 +5,7 @@ from temporal_embedding import TemporalEmbedding
 from PFA import PFA
 
 
-class GAT_LLM(nn.Module):
+class GATLLM(nn.Module):
     def __init__(
         self,
         input_dim=3,
@@ -33,6 +33,7 @@ class GAT_LLM(nn.Module):
             time = 48
         else:
             time = 288
+        self.time = time
 
         gpt_channel = 256
         to_gpt_channel = 768
@@ -101,8 +102,8 @@ class GAT_LLM(nn.Module):
             pe = self.learned_pe.T.unsqueeze(0).unsqueeze(2)  # [1, gpt_channel, 1, T]
             input_seq = x + pe  # [B, gpt_channel, N, T]
 
-            # Use only last step’s feature for fusion (can experiment with mean)
-            input_seq = input_seq[:, :, :, -1:]  # [B, gpt_channel, N, 1]
+            # Aggregate temporal sequence across time dimension
+            input_seq = input_seq.mean(dim=-1, keepdim=True)  # [B, gpt_channel, N, 1]
 
             # --- Feature fusion ---
             data_st = torch.cat([input_seq, tem_emb, node_emb], dim=1)  # [B, 3*gpt_channel, N, 1]
@@ -120,9 +121,12 @@ class GAT_LLM(nn.Module):
             pred = self.regression_layer(gpt_out)  # [B, 1, N, 1]
             predictions.append(pred)
 
-            # --- Autoregressive update (repeat pred to match C=3) ---
-            pred_repeated = pred.repeat(1, self.input_dim, 1, 1)  # [B, C, N, 1]
-            current_input = torch.cat([current_input[:, :, :, 1:], pred_repeated], dim=-1)  # [B, C, N, T]
+            # --- Autoregressive update (update channel 0 with pred, roll forward timestamps) ---
+            next_step = current_input[:, :, :, -1:].clone()
+            next_step[:, 0:1, :, :] = pred
+            if self.input_dim >= 3:
+                next_step[:, 1:2, :, :] = (next_step[:, 1:2, :, :] + 1.0 / self.time) % 1.0
+            current_input = torch.cat([current_input[:, :, :, 1:], next_step], dim=-1)  # [B, C, N, T]
 
         return torch.cat(predictions, dim=1)  # [B, output_len, N, 1]
 

@@ -18,7 +18,7 @@ class GraphConvolution(nn.Module):
             x = self.linear(x)  # [N, F_out]
         elif x.dim() == 3:
             # Batched input: [B, N, F]
-            x = torch.matmul(adj, x.transpose(0, 1)).transpose(0, 1)  # [B, N, F]
+            x = torch.matmul(adj, x)  # [B, N, F]
             x = self.linear(x)  # [B, N, F_out]
         else:
             raise ValueError("Input x must be 2D or 3D")

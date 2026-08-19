@@ -14,7 +14,6 @@ class PFA(nn.Module):
         self.gpt2.h = self.gpt2.h[:gpt_layers]
         self.device = torch.device(device)
         self.U = U
-        # self.device = device        
 
 
         for layer_index, layer in enumerate(self.gpt2.h):
